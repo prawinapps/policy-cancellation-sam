@@ -12,3 +12,6 @@ jobs:
     steps:
       - name: Hello task
         run: echo "Hello from SAM application!!!"
+
+      - name: Second task
+        run: echo "Hello beautiful!!!"
