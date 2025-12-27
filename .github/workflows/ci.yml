@@ -1,17 +1,50 @@
-name: Basic CI
+name: Deploy SAM App
 
+# Trigger workflow on push to main branch
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  say-hello:
+  deploy:
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Hello task
-        run: echo "Hello from SAM application!!!"
+    # Permissions required for OIDC
+    permissions:
+      id-token: write
+      contents: read
 
-      - name: Second task
-        run: echo "Hello beautiful!!!"
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Setup Python (required for SAM CLI)
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Step 3: Install SAM CLI
+      - name: Install AWS SAM CLI
+        run: pip install aws-sam-cli
+
+      # Step 4: Configure AWS credentials via OIDC
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsSAMRole
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Step 5: Build the SAM app
+      - name: SAM Build
+        run: sam build
+
+      # Step 6: Deploy the SAM stack
+      - name: SAM Deploy
+        run: |
+          sam deploy \
+            --stack-name my-sam-app \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset
