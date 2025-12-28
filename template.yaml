@@ -41,6 +41,7 @@ Resources:
   ############################
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
+    DependsOn: PolicyResourceServer
     Properties:
       ClientName: policy-cancellation-client
       UserPoolId: !Ref UserPool
@@ -76,7 +77,6 @@ Resources:
       CodeUri: hello-world/
       Handler: app.lambdaHandler
       Runtime: nodejs20.x
-      FunctionName: policy-cancellation
       Architectures:
         - x86_64
       Policies:
