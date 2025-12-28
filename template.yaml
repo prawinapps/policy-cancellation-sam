@@ -1,25 +1,82 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  policy-cancellation-sam
+Description: policy-cancellation-sam with Cognito scopes
 
-  Sample SAM Template for policy-cancellation-sam
-
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
     Timeout: 5
-
-    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
     LoggingConfig:
       LogFormat: JSON
+
 Resources:
+  ############################
+  # Cognito User Pool
+  ############################
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: policy-cancellation-user-pool
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+  ############################
+  # Cognito Resource Server
+  ############################
+  PolicyResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      UserPoolId: !Ref UserPool
+      Identifier: policy-api
+      Name: PolicyCancellationAPI
+      Scopes:
+        - ScopeName: cancel
+          ScopeDescription: Cancel a policy
+        - ScopeName: read
+          ScopeDescription: Read policy details
+
+  ############################
+  # Cognito App Client
+  ############################
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: policy-cancellation-client
+      UserPoolId: !Ref UserPool
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - client_credentials
+      AllowedOAuthScopes:
+        - policy-api/cancel
+        - policy-api/read
+      SupportedIdentityProviders:
+        - COGNITO
+
+  ############################
+  # API Gateway
+  ############################
+  PolicyCancellationApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: policy-cancellation-api
+      StageName: Prod
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+
+  ############################
+  # Lambda Function
+  ############################
   HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: hello-world/
       Handler: app.lambdaHandler
       Runtime: nodejs20.x
+      FunctionName: policy-cancellation
       Architectures:
         - x86_64
       Policies:
@@ -27,21 +84,28 @@ Resources:
             BucketName: policy-cancellation-payloads
       Events:
         HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Type: Api
           Properties:
+            RestApiId: !Ref PolicyCancellationApi
             Path: /hello
             Method: post
+            Auth:
+              Authorizer: CognitoAuthorizer
+              AuthorizationScopes:
+                - policy-api/cancel
 
+############################
+# Outputs
+############################
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: API Gateway endpoint URL for Prod stage for Hello World function
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: Hello World Lambda Function ARN
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: Implicit IAM Role created for Hello World function
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  ApiUrl:
+    Description: Protected API endpoint
+    Value: !Sub "https://${PolicyCancellationApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello"
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito App Client ID
+    Value: !Ref UserPoolClient
