@@ -17,7 +17,7 @@ const s3 = new S3Client({ region: process.env.AWS_REGION });
 export const lambdaHandler = async (event, context) => {
   let requestPayload = JSON.parse(event.body);
   delete requestPayload.productName;
-  requestPayload.productCode = "555";
+  requestPayload.productCode = "PSS";
   const response = {
     statusCode: 200,
     body: JSON.stringify({
