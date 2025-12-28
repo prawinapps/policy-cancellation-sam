@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
-Description: policy-cancellation-sam with Cognito scopes
+Description: policy-cancellation-sam with Cognito scopes and OAuth endpoint
 
 Globals:
   Function:
@@ -32,9 +32,9 @@ Resources:
       Name: PolicyCancellationAPI
       Scopes:
         - ScopeName: cancel
-          ScopeDescription: Cancel a policy
+          ScopeDescription: Cancel policy
         - ScopeName: read
-          ScopeDescription: Read policy details
+          ScopeDescription: Read policy
 
   ############################
   # Cognito App Client
@@ -54,6 +54,15 @@ Resources:
         - policy-api/read
       SupportedIdentityProviders:
         - COGNITO
+
+  ############################
+  # Cognito Domain (OAuth endpoint)
+  ############################
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: policy-cancellation-auth
+      UserPoolId: !Ref UserPool
 
   ############################
   # API Gateway
@@ -109,3 +118,7 @@ Outputs:
   UserPoolClientId:
     Description: Cognito App Client ID
     Value: !Ref UserPoolClient
+
+  CognitoTokenEndpoint:
+    Description: OAuth2 token endpoint
+    Value: !Sub "https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token"
